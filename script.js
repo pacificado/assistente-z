@@ -10,13 +10,16 @@ const recognition = new SpeechRecognition();
 recognition.lang = 'pt-BR';
 recognition.continuous = false;
 
-// Função para o Robô Falar
+let userName = ""; // Aqui o robô guarda o nome temporariamente
+let isAskingName = false; // Para saber se o robô está esperando o nome ou um comando
+
 const speak = (text) => {
     return new Promise((resolve) => {
+        window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'pt-BR';
-        utterance.rate = 1.1; 
-        utterance.pitch = 0.9; 
+        utterance.rate = 1.0;
+        utterance.pitch = 1.0;
 
         utterance.onstart = () => {
             sphere.className = "sphere speaking";
@@ -33,72 +36,79 @@ const speak = (text) => {
     });
 };
 
-// Saudação ao carregar a página
 window.onload = () => {
-    setTimeout(async () => {
-        greetingText.innerText = "Sistemas Online";
-        await speak("Olá Reginaldo, o que eu posso fazer hoje por você?");
-    }, 1000);
+    greetingText.innerText = "Sistemas Prontos";
+    statusText.innerText = "Toque no botão para iniciar";
 };
 
-actionBtn.addEventListener('click', () => {
-    recognition.start();
+actionBtn.addEventListener('click', async () => {
+    // Se o robô ainda não sabe o nome, ele pergunta
+    if (userName === "") {
+        greetingText.innerText = "Identificação...";
+        await speak("Olá, eu sou o Assistente Z. Como é o seu nome?");
+        isAskingName = true;
+        try {
+            recognition.start(); // Abre o microfone para ouvir o nome
+        } catch (e) { console.log(e); }
+    } else {
+        // Se já sabe o nome, apenas ouve o comando
+        isAskingName = false;
+        try {
+            recognition.start();
+        } catch (e) { console.log(e); }
+    }
 });
 
 recognition.onstart = () => {
     sphere.className = "sphere listening";
-    statusText.innerText = "Ouvindo...";
+    statusText.innerText = isAskingName ? "Diga seu nome..." : "Ouvindo comando...";
     transcriptArea.innerText = "";
 };
 
-recognition.onresult = (event) => {
-    const command = event.results[0][0].transcript.toLowerCase();
-    transcriptArea.innerText = "${command}";
-    processCommand(command);
+recognition.onresult = async (event) => {
+    const speechResult = event.results[0][0].transcript.toLowerCase();
+    transcriptArea.innerText = "${speechResult}";
+
+    if (isAskingName) {
+        // O robô salva o nome que ouviu
+        userName = speechResult;
+        greetingText.innerText = Olá, ${userName};
+        await speak(Olá ${userName}, em que posso lhe ajudar hoje?);
+        isAskingName = false;
+    } else {
+        // Se já sabe o nome, processa o comando
+        processCommand(speechResult);
+    }
 };
 
-recognition.onerror = () => {
+recognition.onerror = (event) => {
     sphere.className = "sphere idle";
-    statusText.innerText = "Não entendi, tente de novo.";
+    statusText.innerText = "Erro: " + event.error;
 };
 
 async function processCommand(text) {
-    // REDES SOCIAIS E BUSCA (URLs Verificadas)
     if (text.includes('youtube')) {
-        let query = text.replace('pesquisar', '').replace('no youtube', '').replace('vídeo', '').replace('youtube', '').trim();
-        await speak(Buscando ${query || 'vídeos'} no YouTube.);
-        const url = query ? https://www.youtube.com/results?search_query=${query} : https://www.youtube.com;
-        window.open(url, '_blank');
+        let query = text.replace('pesquisar', '').replace('no youtube', '').trim();
+        await speak(Entendido ${userName}, buscando no YouTube.);
+        const baseUrl = query ? https://www.youtube.com/results?search_query=${query} : https://www.youtube.com/;
+        window.open(baseUrl, '_blank');
     } 
     else if (text.includes('google') || text.includes('pesquisar')) {
         let query = text.replace('pesquisar', '').replace('no google', '').trim();
-        await speak(Pesquisando ${query} no Google.);
+        await speak(Certo ${userName}, pesquisando no Google.);
         window.open(https://www.google.com/search?q=${query}, '_blank');
     }
-    else if (text.includes('whatsapp') || text.includes('zap')) {
-        await speak("Abrindo seu WhatsApp.");
-        window.open('https://web.whatsapp.com/', '_blank');
-    }
-    else if (text.includes('instagram')) {
-        await speak("Acessando o Instagram.");
-        window.open('https://www.instagram.com/', '_blank');
-    }
-    else if (text.includes('facebook')) {
-        await speak("Abrindo o Facebook.");
-        window.open('https://www.facebook.com/', '_blank');
-    }
-    else if (text.includes('tiktok')) {
-        await speak("Iniciando o TikTok.");
-        window.open('https://www.tiktok.com/', '_blank');
-    }
-    // ARQUIVOS
     else if (text.includes('arquivos') || text.includes('pastas')) {
-        await speak("Reginaldo, estou abrindo o seletor de arquivos para você.");
+        await speak(Com certeza ${userName}, abrindo o seletor de arquivos.);
         const input = document.createElement('input');
         input.type = 'file';
         input.click();
     }
+    else if (text.includes('whatsapp') || text.includes('zap')) {
+        await speak(${userName}, abrindo seu WhatsApp.);
+        window.open('https://web.whatsapp.com/', '_blank');
+    }
     else {
-        await speak("Ainda não conheço esse comando, Reginaldo.");
+        await speak(Desculpe ${userName}, ainda não conheço esse comando.);
     }
 }
