@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assistente Z - Robô Inteligente</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Rosto do Robô -->
+        <div class="robot-head">
+            <div class="eye left"></div>
+            <div class="eye right"></div>
+            <div class="mouth"></div>
+        </div>
+
+        <header>
+            <h1>Assistente <span class="logo-z">Z</span></h1>
+            <div id="greeting" class="greeting-text">Iniciando sistemas...</div>
+        </header>
+
+        <!-- Esfera de Energia (Onde ele ouve) -->
+        <div class="voice-container">
+            <div id="visualizer" class="sphere idle"></div>
+            <div id="status" class="status-text">Toque no botão para falar</div>
+        </div>
+
+        <div id="transcript" class="transcript-box"></div>
+
+        <!-- Botão Principal -->
+        <div class="controls">
+            <button id="action-btn" class="main-btn">
+                M
+            </button>
+        </div>
+
+        <!-- Grade de Skills -->
+        <div class="skills-grid">
+            <div class="skill-item">YouTube</div>
+            <div class="skill-item">WhatsApp</div>
+            <div class="skill-item">Instagram</div>
+            <div class="skill-item">Facebook</div>
+            <div class="skill-item">TikTok</div>
+            <div class="skill-item">Arquivos</div>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
