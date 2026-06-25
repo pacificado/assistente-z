@@ -9,19 +9,28 @@ const recognition = new SpeechRecognition();
 
 recognition.lang = 'pt-BR';
 recognition.continuous = false;
-recognition.interimResults = false; // Garante que só processa o resultado final
+recognition.interimResults = false;
 
-let userName = ""; // Aqui o robô guarda o nome temporariamente
-let isAskingName = false; // Para saber se o robô está esperando o nome ou um comando
-let isListening = false; // Flag para evitar duplicidade ao ligar o microfone
+let userName = ""; 
+let isAskingName = false; 
+let isListening = false;
+let isFirstClick = true; // Nova flag para controlar o primeiro contato
 
 const speak = (text) => {
     return new Promise((resolve) => {
         window.speechSynthesis.cancel();
+        
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'pt-BR';
         utterance.rate = 1.0;
         utterance.pitch = 1.0;
+
+        // SISTEMA ANTI-TRAVAMENTO: Se o navegador engasgar, destrava após 3.5 segundos
+        const fallbackTimeout = setTimeout(() => {
+            console.warn("SpeechSynthesis travou. Forçando desbloqueio...");
+            sphere.className = "sphere idle";
+            resolve();
+        }, 3500);
 
         utterance.onstart = () => {
             sphere.className = "sphere speaking";
@@ -29,6 +38,7 @@ const speak = (text) => {
         };
 
         utterance.onend = () => {
+            clearTimeout(fallbackTimeout); // Cancela o timeout de segurança
             sphere.className = "sphere idle";
             statusText.innerText = "Toque para falar";
             resolve();
@@ -38,33 +48,44 @@ const speak = (text) => {
     });
 };
 
+// Inicialização limpa: SEM chamar voz aqui
 window.onload = () => {
-    greetingText.innerText = "Sistemas Prontos";
+    greetingText.innerText = "Assistente Z";
     statusText.innerText = "Toque no botão para iniciar";
+    sphere.className = "sphere idle";
 };
 
-// Função segura para iniciar o reconhecimento de voz
 const startRecognition = () => {
     if (!isListening) {
         try {
             recognition.start();
         } catch (e) { 
-            console.log("Erro ao iniciar reconhecimento:", e); 
+            console.log("Erro ao iniciar microfone:", e); 
+            isListening = false;
         }
     }
 };
 
 actionBtn.addEventListener('click', async () => {
-    // Se estiver ouvindo, para. Se não, inicia o fluxo.
+    // Se o microfone já estiver ativo, o clique apenas para a escuta
     if (isListening) {
         recognition.stop();
         return;
     }
 
-    if (userName === "") {
+    // Se for o primeiro clique na tela, roda a introdução (Desbloqueia o Autoplay)
+    if (isFirstClick) {
+        isFirstClick = false;
         greetingText.innerText = "Identificação...";
         isAskingName = true;
         await speak("Olá, eu sou o Assistente Z. Como é o seu nome?");
+        startRecognition();
+        return;
+    }
+
+    // Fluxo normal após a inicialização
+    if (userName === "") {
+        isAskingName = true;
         startRecognition();
     } else {
         isAskingName = false;
@@ -81,16 +102,19 @@ recognition.onstart = () => {
 
 recognition.onend = () => {
     isListening = false;
-    if (statusText.innerText !== "Falando...") {
-        sphere.className = "sphere idle";
-        statusText.innerText = "Toque para falar";
-    }
+    // Só volta para o estado ocioso se não mudou para "Falando..." no meio tempo
+    setTimeout(() => {
+        if (!window.speechSynthesis.speaking) {
+            sphere.className = "sphere idle";
+            statusText.innerText = "Toque para falar";
+        }
+    }, 100);
 };
 
 recognition.onerror = (event) => {
     isListening = false;
     sphere.className = "sphere idle";
-    statusText.innerText = "Erro: " + event.error;
+    statusText.innerText = "Erro no microfone: " + event.error;
     console.error("Erro no SpeechRecognition:", event.error);
 };
 
@@ -99,7 +123,6 @@ recognition.onresult = async (event) => {
     transcriptArea.innerText = "${speechResult}";
 
     if (isAskingName) {
-        // Salva o nome (primeira letra maiúscula para ficar bonito na tela)
         userName = speechResult.charAt(0).toUpperCase() + speechResult.slice(1);
         greetingText.innerText = Olá, ${userName};
         isAskingName = false;
@@ -111,7 +134,6 @@ recognition.onresult = async (event) => {
 
 async function processCommand(text) {
     if (text.includes('youtube')) {
-        // Limpa termos comuns para isolar a pesquisa
         let query = text.replace(/pesquisar/g, '').replace(/no youtube/g, '').replace(/youtube/g, '').trim();
         await speak(Entendido ${userName}, buscando no YouTube.);
         const baseUrl = query ? https://www.youtube.com/results?search_query=${encodeURIComponent(query)} : https://www.youtube.com/;
