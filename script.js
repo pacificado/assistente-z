@@ -9,28 +9,17 @@ const recognition = new SpeechRecognition();
 
 recognition.lang = 'pt-BR';
 recognition.continuous = false;
-recognition.interimResults = false;
 
 let userName = ""; 
 let isAskingName = false; 
-let isListening = false;
-let isFirstClick = true; // Nova flag para controlar o primeiro contato
 
 const speak = (text) => {
     return new Promise((resolve) => {
-        window.speechSynthesis.cancel();
-        
+        window.speechSynthesis.cancel(); // Limpa falas anteriores
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'pt-BR';
         utterance.rate = 1.0;
         utterance.pitch = 1.0;
-
-        // SISTEMA ANTI-TRAVAMENTO: Se o navegador engasgar, destrava após 3.5 segundos
-        const fallbackTimeout = setTimeout(() => {
-            console.warn("SpeechSynthesis travou. Forçando desbloqueio...");
-            sphere.className = "sphere idle";
-            resolve();
-        }, 3500);
 
         utterance.onstart = () => {
             sphere.className = "sphere speaking";
@@ -38,7 +27,6 @@ const speak = (text) => {
         };
 
         utterance.onend = () => {
-            clearTimeout(fallbackTimeout); // Cancela o timeout de segurança
             sphere.className = "sphere idle";
             statusText.innerText = "Toque para falar";
             resolve();
@@ -48,113 +36,78 @@ const speak = (text) => {
     });
 };
 
-// Inicialização limpa: SEM chamar voz aqui
+// Quando a página carregar, ele fica em espera silenciosa
 window.onload = () => {
-    greetingText.innerText = "Assistente Z";
-    statusText.innerText = "Toque no botão para iniciar";
-    sphere.className = "sphere idle";
-};
-
-const startRecognition = () => {
-    if (!isListening) {
-        try {
-            recognition.start();
-        } catch (e) { 
-            console.log("Erro ao iniciar microfone:", e); 
-            isListening = false;
-        }
-    }
+    greetingText.innerText = "Sistemas em Espera";
+    statusText.innerText = "Toque no botão para ligar o robô";
 };
 
 actionBtn.addEventListener('click', async () => {
-    // Se o microfone já estiver ativo, o clique apenas para a escuta
-    if (isListening) {
-        recognition.stop();
-        return;
-    }
-
-    // Se for o primeiro clique na tela, roda a introdução (Desbloqueia o Autoplay)
-    if (isFirstClick) {
-        isFirstClick = false;
-        greetingText.innerText = "Identificação...";
-        isAskingName = true;
-        await speak("Olá, eu sou o Assistente Z. Como é o seu nome?");
-        startRecognition();
-        return;
-    }
-
-    // Fluxo normal após a inicialização
+    // Na primeira interação, o robô desperta e pergunta o nome
     if (userName === "") {
+        greetingText.innerText = "Identificação...";
+        await speak("Olá, eu sou o Assistente Z. Qual é o seu nome?");
         isAskingName = true;
-        startRecognition();
+        try {
+            recognition.start(); 
+        } catch (e) { console.log("Microfone ativo"); }
     } else {
+        // Nas próximas, ele apenas ouve o seu comando
         isAskingName = false;
-        startRecognition();
+        try {
+            recognition.start();
+        } catch (e) { console.log("Microfone ativo"); }
     }
 });
 
 recognition.onstart = () => {
-    isListening = true;
     sphere.className = "sphere listening";
     statusText.innerText = isAskingName ? "Diga seu nome..." : "Ouvindo comando...";
     transcriptArea.innerText = "";
 };
 
-recognition.onend = () => {
-    isListening = false;
-    // Só volta para o estado ocioso se não mudou para "Falando..." no meio tempo
-    setTimeout(() => {
-        if (!window.speechSynthesis.speaking) {
-            sphere.className = "sphere idle";
-            statusText.innerText = "Toque para falar";
-        }
-    }, 100);
-};
-
-recognition.onerror = (event) => {
-    isListening = false;
-    sphere.className = "sphere idle";
-    statusText.innerText = "Erro no microfone: " + event.error;
-    console.error("Erro no SpeechRecognition:", event.error);
-};
-
 recognition.onresult = async (event) => {
-    const speechResult = event.results[0][0].transcript.trim();
+    const speechResult = event.results[0][0].transcript.toLowerCase();
     transcriptArea.innerText = "${speechResult}";
 
     if (isAskingName) {
-        userName = speechResult.charAt(0).toUpperCase() + speechResult.slice(1);
+        userName = speechResult;
         greetingText.innerText = Olá, ${userName};
-        isAskingName = false;
         await speak(Olá ${userName}, em que posso lhe ajudar hoje?);
+        isAskingName = false;
     } else {
-        processCommand(speechResult.toLowerCase());
+        processCommand(speechResult);
     }
+};
+
+recognition.onerror = () => {
+    sphere.className = "sphere idle";
+    statusText.innerText = "Não entendi, tente falar de novo";
 };
 
 async function processCommand(text) {
     if (text.includes('youtube')) {
-        let query = text.replace(/pesquisar/g, '').replace(/no youtube/g, '').replace(/youtube/g, '').trim();
-        await speak(Entendido ${userName}, buscando no YouTube.);
-        const baseUrl = query ? https://www.youtube.com/results?search_query=${encodeURIComponent(query)} : https://www.youtube.com/;
-        window.open(baseUrl, '_blank');
+        let query = text.replace('pesquisar', '').replace('no youtube', '').trim();
+        await speak(Buscando no YouTube.);
+        const url = query ? https://www.youtube.com/results?search_query=${query} : https://www.youtube.com/;
+        window.open(url, '_blank');
     } 
     else if (text.includes('google') || text.includes('pesquisar')) {
-        let query = text.replace(/pesquisar/g, '').replace(/no google/g, '').replace(/google/g, '').trim();
-        await speak(Certo ${userName}, pesquisando no Google.);
-        window.open(https://www.google.com/search?q=${encodeURIComponent(query)}, '_blank');
+        let query = text.replace('pesquisar', '').replace('no google', '').trim();
+        await speak(Pesquisando no Google.);
+        window.open(https://www.google.com/search?q=${query}, '_blank');
     }
     else if (text.includes('arquivos') || text.includes('pastas')) {
-        await speak(Com certeza ${userName}, abrindo o seletor de arquivos.);
+        await speak(Abrindo seletor de arquivos.);
         const input = document.createElement('input');
         input.type = 'file';
         input.click();
     }
     else if (text.includes('whatsapp') || text.includes('zap')) {
-        await speak(${userName}, abrindo seu WhatsApp.);
+        await speak(Abrindo seu WhatsApp.);
         window.open('https://web.whatsapp.com/', '_blank');
     }
     else {
-        await speak(Desculpe ${userName}, ainda não conheço o comando: ${text});
+        await speak(Comando não identificado.);
     }
 }
